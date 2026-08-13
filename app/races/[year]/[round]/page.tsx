@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCircuitResults, getQualifyingResults, getRaceResults } from "@/lib/f1-api";
 import { QualifyingResultsTable, RaceResultsTable } from "@/components/ResultsTable";
-import { driverName, formatDate } from "@/lib/format";
+import { driverName, f1tvSearchUrl, formatDate } from "@/lib/format";
 
 export default async function RaceDetailPage({
   params,
@@ -25,15 +25,25 @@ export default async function RaceDetailPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Round {race.round} · {race.season}
-        </p>
-        <h1 className="text-2xl font-bold">{race.raceName}</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {race.Circuit.circuitName} · {race.Circuit.Location.locality}, {race.Circuit.Location.country} ·{" "}
-          {formatDate(race.date)}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Round {race.round} · {race.season}
+          </p>
+          <h1 className="text-2xl font-bold">{race.raceName}</h1>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            {race.Circuit.circuitName} · {race.Circuit.Location.locality}, {race.Circuit.Location.country} ·{" "}
+            {formatDate(race.date)}
+          </p>
+        </div>
+        <a
+          href={f1tvSearchUrl(race.season, race.raceName)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+        >
+          Watch on F1TV ↗
+        </a>
       </div>
 
       <section>
