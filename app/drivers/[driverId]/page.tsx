@@ -4,9 +4,11 @@ import { summarizeBySeasons, summarizeCareer } from "@/lib/aggregate";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { driverName, formatDate } from "@/lib/format";
 
-/** Cap on concurrent per-season standings requests — stays comfortably under
- * Jolpica's burst rate limit even for a 20+ season career. */
-const STANDINGS_FETCH_CONCURRENCY = 4;
+/** Cap on concurrent per-season standings requests, plus a stagger between
+ * each slot's start — kept conservative on purpose. A long career means a
+ * slower load, but that's preferable to tripping Jolpica's rate limit. */
+const STANDINGS_FETCH_CONCURRENCY = 2;
+const STANDINGS_FETCH_STAGGER_MS = 150;
 
 export default async function DriverDetailPage({
   params,
@@ -23,12 +25,20 @@ export default async function DriverDetailPage({
 
   // The results endpoint doesn't return final championship position, so pull
   // standings for each season the driver raced in and match it up. Fetched
-  // with capped concurrency (rather than one giant Promise.all) so a long
-  // career doesn't burst past the API's rate limit and silently lose years —
-  // f1Fetch already retries transient failures, so a season only ends up
-  // empty here if it genuinely has no standings data.
-  const standingsPerSeason = await mapWithConcurrency(seasonSummaries, STANDINGS_FETCH_CONCURRENCY, (summary) =>
-    getDriverStandings(summary.season).catch(() => []),
+  // with capped, staggered concurrency (rather than one giant Promise.all)
+  // so a long career doesn't burst past the API's rate limit and silently
+  // lose years — f1Fetch already retries transient failures (with a real
+  // new request each time, not a memoized replay of the same failure), so
+  // a season only ends up empty here if it genuinely has no standings data.
+  const standingsPerSeason = await mapWithConcurrency(
+    seasonSummaries,
+    STANDINGS_FETCH_CONCURRENCY,
+    (summary) =>
+      getDriverStandings(summary.season).catch((err) => {
+        console.error(`Failed to load ${summary.season} standings for driver ${driverId}:`, err);
+        return [];
+      }),
+    STANDINGS_FETCH_STAGGER_MS,
   );
 
   let championships = 0;

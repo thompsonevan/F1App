@@ -34,8 +34,8 @@ const MAX_PAGE_LIMIT = 100;
 const MAX_PAGES = 100;
 
 /** Transient-failure retries before giving up on a request. */
-const MAX_RETRIES = 4;
-const RETRY_BASE_DELAY_MS = 400;
+const MAX_RETRIES = 5;
+const RETRY_BASE_DELAY_MS = 500;
 
 class F1ApiError extends Error {
   constructor(
@@ -62,12 +62,20 @@ function isRetryableStatus(status: number): boolean {
  * (e.g. one per season of a long career) can get partially rate-limited —
  * and if the caller swallows the error, specific seasons silently vanish
  * from the data instead of surfacing a failure.
+ *
+ * IMPORTANT: Next.js automatically memoizes `fetch(url, options)` calls that
+ * are byte-for-byte identical within a single render pass — retrying with
+ * the exact same URL would just hand back the same failed response instead
+ * of making a new request, silently defeating retries. So every retry after
+ * the first appends a `_retry=N` cache-busting param to force a real
+ * network call. (The upstream API ignores unknown query params.)
  */
 async function f1Fetch<T>(path: string, revalidate: number): Promise<MRData<T>> {
   let lastError: F1ApiError | undefined;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const attemptPath = attempt === 0 ? path : `${path}${path.includes("?") ? "&" : "?"}_retry=${attempt}`;
+    const res = await fetch(`${BASE_URL}${attemptPath}`, {
       next: { revalidate },
     });
 
