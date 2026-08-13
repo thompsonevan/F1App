@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllConstructors, getAllDrivers, getAllSeasons, getCurrentSeasonSchedule } from "@/lib/f1-api";
 import { driverName } from "@/lib/format";
+import { canonicalConstructorId } from "@/lib/team-lineage";
 
 export interface SearchResult {
   type: "driver" | "race" | "season" | "team";
@@ -52,6 +53,13 @@ export async function GET(request: NextRequest) {
       href: `/drivers/${driver.driverId}`,
     }));
 
+  // `constructors` includes every historical id — e.g. "jordan" and
+  // "aston_martin" both appear as separate rows in the raw data — so a
+  // former name is already matchable here with no extra work. What needs
+  // handling is pointing that match at the team's current page (which is
+  // what /teams itself links to, since former ids redirect there) and
+  // labeling it as a former name rather than the current one.
+  const constructorById = new Map(constructors.map((c) => [c.constructorId, c]));
   const matchedTeams: SearchResult[] = constructors
     .filter(
       (constructor) =>
@@ -60,13 +68,19 @@ export async function GET(request: NextRequest) {
         constructor.constructorId.toLowerCase().includes(query),
     )
     .slice(0, RESULTS_PER_GROUP)
-    .map((constructor) => ({
-      type: "team",
-      id: constructor.constructorId,
-      label: constructor.name,
-      sub: constructor.nationality,
-      href: `/teams/${constructor.constructorId}`,
-    }));
+    .map((constructor) => {
+      const canonicalId = canonicalConstructorId(constructor.constructorId);
+      const isFormerName = canonicalId !== constructor.constructorId;
+      const canonicalName = isFormerName ? constructorById.get(canonicalId)?.name : undefined;
+
+      return {
+        type: "team",
+        id: constructor.constructorId,
+        label: constructor.name,
+        sub: canonicalName ? `now ${canonicalName}` : constructor.nationality,
+        href: `/teams/${canonicalId}`,
+      };
+    });
 
   const matchedSeasons: SearchResult[] = seasons
     .filter((season) => season.season.startsWith(query))

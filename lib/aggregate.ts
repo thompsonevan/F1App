@@ -82,6 +82,50 @@ export function summarizeCareer(careerRaces: Race[]): CareerTotals {
   return totals;
 }
 
+export interface ConstructorNamePeriod {
+  name: string;
+  fromSeason: string;
+  toSeason: string;
+}
+
+/**
+ * Some constructors keep the same `constructorId` across a sponsor/title
+ * rename (e.g. Sauber → Alfa Romeo → Kick Sauber) — the single canonical
+ * `/constructors/{id}` record only exposes today's name, but each season's
+ * race results snapshot the name actually used *that season*. Walking
+ * career results recovers that history with no guessing involved: it's
+ * read straight from the data, not a curated list (contrast with
+ * lib/team-lineage.ts, which handles the case where the team changed
+ * `constructorId` entirely and there's no way to derive that from the API).
+ */
+export function summarizeConstructorNameHistory(careerRaces: Race[]): ConstructorNamePeriod[] {
+  const nameBySeason = new Map<string, string>();
+  for (const race of careerRaces) {
+    const name = race.Results?.[0]?.Constructor.name;
+    if (name && !nameBySeason.has(race.season)) {
+      nameBySeason.set(race.season, name);
+    }
+  }
+
+  const seasons = Array.from(nameBySeason.keys()).sort((a, b) => Number(a) - Number(b));
+  const periods: ConstructorNamePeriod[] = [];
+
+  for (const season of seasons) {
+    const name = nameBySeason.get(season) as string;
+    const current = periods[periods.length - 1];
+    // Extends the current period only if the name matches AND the season is
+    // contiguous — a gap year (even under the same name) starts a fresh
+    // period rather than silently bridging over an absence.
+    if (current && current.name === name && Number(season) === Number(current.toSeason) + 1) {
+      current.toSeason = season;
+    } else {
+      periods.push({ name, fromSeason: season, toSeason: season });
+    }
+  }
+
+  return periods;
+}
+
 export interface ConstructorSeasonSummary {
   season: string;
   driverNames: string[];

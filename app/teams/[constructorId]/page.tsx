@@ -1,38 +1,74 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getConstructor, getConstructorCareerResults, getConstructorStandings } from "@/lib/f1-api";
-import { summarizeConstructorBySeasons, summarizeConstructorCareer } from "@/lib/aggregate";
+import {
+  summarizeConstructorBySeasons,
+  summarizeConstructorCareer,
+  summarizeConstructorNameHistory,
+} from "@/lib/aggregate";
 import { mapWithConcurrency } from "@/lib/concurrency";
+import { canonicalConstructorId, lineageFor } from "@/lib/team-lineage";
 
 /** Cap on concurrent per-season standings requests, plus a stagger between
  * each slot's start — kept conservative on purpose. A long history means a
  * slower load, but that's preferable to tripping Jolpica's rate limit. */
 const STANDINGS_FETCH_CONCURRENCY = 2;
 const STANDINGS_FETCH_STAGGER_MS = 150;
+/** Same idea for the (much smaller) fan-out across a team's former identities. */
+const LINEAGE_FETCH_CONCURRENCY = 3;
 
 export default async function TeamDetailPage({
   params,
 }: {
   params: Promise<{ constructorId: string }>;
 }) {
-  const { constructorId } = await params;
-  const constructor = await getConstructor(constructorId);
+  const { constructorId: requestedId } = await params;
+  const canonicalId = canonicalConstructorId(requestedId);
+
+  // An old identity (e.g. /teams/jordan) always resolves through to its
+  // team's current page — one canonical URL per team lineage.
+  if (canonicalId !== requestedId) {
+    redirect(`/teams/${canonicalId}`);
+  }
+
+  const constructor = await getConstructor(canonicalId);
   if (!constructor) notFound();
 
-  const careerRaces = await getConstructorCareerResults(constructorId);
+  const lineage = lineageFor(canonicalId);
+  const lineageIds = [canonicalId, ...(lineage?.formerIds ?? [])];
+
+  // Career results are fetched per constructorId in the lineage and merged —
+  // summarizeConstructorBySeasons/Career group by season regardless of which
+  // underlying id a race came from, so this "just works" the same way it
+  // does for a team that never changed identity.
+  const careerRacesPerId = await mapWithConcurrency(
+    lineageIds,
+    LINEAGE_FETCH_CONCURRENCY,
+    (id) =>
+      getConstructorCareerResults(id).catch((err) => {
+        console.error(`Failed to load career results for constructor ${id}:`, err);
+        return [];
+      }),
+  );
+  const careerRaces = careerRacesPerId.flat();
+
   const seasonSummaries = summarizeConstructorBySeasons(careerRaces);
   const careerTotals = summarizeConstructorCareer(careerRaces);
+  // Fully data-driven — no lineage config involved. Catches both a rename
+  // under this exact constructorId (e.g. Sauber -> Alfa Romeo) and any
+  // curated former identities merged in above.
+  const nameHistory = summarizeConstructorNameHistory(careerRaces);
 
-  // Same rationale as the driver detail page: the results endpoint doesn't
-  // return final championship position, so pull standings per season the
-  // team competed in, with capped/staggered concurrency so a long history
+  // The results endpoint doesn't return final championship position, so
+  // pull standings per season the team (under any of its lineage's ids)
+  // competed in, with capped/staggered concurrency so a long history
   // doesn't burst past the API's rate limit.
   const standingsPerSeason = await mapWithConcurrency(
     seasonSummaries,
     STANDINGS_FETCH_CONCURRENCY,
     (summary) =>
       getConstructorStandings(summary.season).catch((err) => {
-        console.error(`Failed to load ${summary.season} standings for constructor ${constructorId}:`, err);
+        console.error(`Failed to load ${summary.season} standings for constructor ${canonicalId}:`, err);
         return [];
       }),
     STANDINGS_FETCH_STAGGER_MS,
@@ -40,7 +76,10 @@ export default async function TeamDetailPage({
 
   let championships = 0;
   seasonSummaries.forEach((summary, i) => {
-    const standing = standingsPerSeason[i].find((s) => s.Constructor.constructorId === constructorId);
+    // A season's standings report the id actually used that year (e.g.
+    // "jordan" for 2003), not the canonical id, so match against the whole
+    // lineage rather than just canonicalId.
+    const standing = standingsPerSeason[i].find((s) => lineageIds.includes(s.Constructor.constructorId));
     if (standing) {
       summary.finalPosition = standing.position;
       if (standing.position === "1") championships += 1;
@@ -55,6 +94,15 @@ export default async function TeamDetailPage({
       <div>
         <h1 className="text-2xl font-bold">{constructor.name}</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">{constructor.nationality}</p>
+        {nameHistory.length > 1 && (
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
+            Also raced as{" "}
+            {nameHistory
+              .slice(0, -1)
+              .map((period) => `${period.name} (${period.fromSeason}–${period.toSeason})`)
+              .join(", ")}
+          </p>
+        )}
       </div>
 
       <section>
