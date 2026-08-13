@@ -178,11 +178,54 @@ export async function getDriverStandings(year: string | number = "current") {
   return data.MRData.StandingsTable.StandingsLists[0]?.DriverStandings ?? [];
 }
 
-/** Constructor standings for a season ("current" for the live season). */
+/**
+ * Every constructor entered in a given season — independent of results, so
+ * a team shows up here as soon as it's on the entry list, whether or not
+ * it's scored a point yet.
+ */
+export async function getSeasonConstructors(year: string | number): Promise<Constructor[]> {
+  const revalidate = year === "current" || !isPastSeason(year) ? REVALIDATE_SHORT : REVALIDATE_LONG;
+  const data = await f1Fetch<ConstructorTable>(`/${year}/constructors.json?limit=100`, revalidate);
+  return data.MRData.ConstructorTable.Constructors;
+}
+
+/**
+ * Constructor standings for a season ("current" for the live season).
+ *
+ * The standings endpoint only lists constructors that have been classified
+ * in at least one race — a team that has entered the season but hasn't
+ * finished a race yet (a new entrant early in the season, everything
+ * retired so far, etc.) can be missing entirely, not just shown with 0
+ * points. Cross-referencing against the season's actual entry list catches
+ * that and backfills a zero-point placeholder, so every entrant shows up
+ * everywhere standings are rendered.
+ */
 export async function getConstructorStandings(year: string | number = "current") {
   const revalidate = year === "current" || !isPastSeason(year) ? REVALIDATE_SHORT : REVALIDATE_LONG;
-  const data = await f1Fetch<StandingsTable>(`/${year}/constructorStandings.json`, revalidate);
-  return data.MRData.StandingsTable.StandingsLists[0]?.ConstructorStandings ?? [];
+
+  const [data, seasonConstructors] = await Promise.all([
+    f1Fetch<StandingsTable>(`/${year}/constructorStandings.json`, revalidate),
+    getSeasonConstructors(year).catch((err) => {
+      console.error(`Failed to load ${year} season constructor list:`, err);
+      return [] as Constructor[];
+    }),
+  ]);
+
+  const standings = data.MRData.StandingsTable.StandingsLists[0]?.ConstructorStandings ?? [];
+  const classifiedIds = new Set(standings.map((s) => s.Constructor.constructorId));
+
+  const unclassified = seasonConstructors
+    .filter((c) => !classifiedIds.has(c.constructorId))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((c) => ({
+      position: "—",
+      positionText: "—",
+      points: "0",
+      wins: "0",
+      Constructor: c,
+    }));
+
+  return [...standings, ...unclassified];
 }
 
 // ---------------------------------------------------------------------------
