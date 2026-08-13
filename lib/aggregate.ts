@@ -5,7 +5,7 @@
  * `Results` array for that driver).
  */
 
-import type { Race } from "./types";
+import type { DriverStanding, Race } from "./types";
 import { driverName } from "./format";
 
 export interface SeasonSummary {
@@ -254,4 +254,63 @@ export function summarizeConstructorCareer(careerRaces: Race[]): ConstructorCare
 
   totals.seasons = Array.from(seasons).sort((a, b) => Number(a) - Number(b));
   return totals;
+}
+
+export interface DriverDirectoryEntry {
+  driverId: string;
+  name: string;
+  nationality: string;
+  debutSeason: string;
+  lastSeason: string;
+  isCurrent: boolean;
+  wins: number;
+  points: number;
+}
+
+/**
+ * Builds a roster of every driver who has ever appeared in a season's
+ * final standings, with career wins/points and their first/last season.
+ *
+ * This deliberately avoids the one thing it can't cheaply do: podiums and
+ * poles aren't in standings data at all (only position/points/wins are),
+ * and getting them for every driver in F1 history would mean a full
+ * race-results fetch per driver — 860+ requests, not feasible on a single
+ * page load. Wins and points, though, are already *season* totals in each
+ * standings entry, so summing them across every season a driver appeared
+ * in gives an accurate career total with no per-driver fetch at all.
+ */
+export function buildDriverDirectory(
+  standingsBySeason: Map<string, DriverStanding[]>,
+  currentSeason: string,
+): DriverDirectoryEntry[] {
+  const byDriver = new Map<string, DriverDirectoryEntry>();
+
+  for (const [season, standings] of standingsBySeason) {
+    for (const standing of standings) {
+      const id = standing.Driver.driverId;
+      const entry = byDriver.get(id) ?? {
+        driverId: id,
+        name: driverName(standing.Driver),
+        nationality: standing.Driver.nationality,
+        debutSeason: season,
+        lastSeason: season,
+        isCurrent: false,
+        wins: 0,
+        points: 0,
+      };
+
+      if (Number(season) < Number(entry.debutSeason)) entry.debutSeason = season;
+      if (Number(season) > Number(entry.lastSeason)) entry.lastSeason = season;
+      entry.wins += Number(standing.wins) || 0;
+      entry.points += Number(standing.points) || 0;
+
+      byDriver.set(id, entry);
+    }
+  }
+
+  for (const entry of byDriver.values()) {
+    entry.isCurrent = entry.lastSeason === currentSeason;
+  }
+
+  return Array.from(byDriver.values());
 }
