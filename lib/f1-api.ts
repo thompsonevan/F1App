@@ -33,6 +33,10 @@ const MAX_PAGE_LIMIT = 100;
 /** Safety cap on pagination loops (100 pages * 100 rows = 10,000 rows). */
 const MAX_PAGES = 100;
 
+/** Transient-failure retries before giving up on a request. */
+const MAX_RETRIES = 4;
+const RETRY_BASE_DELAY_MS = 400;
+
 class F1ApiError extends Error {
   constructor(
     public status: number,
@@ -42,16 +46,48 @@ class F1ApiError extends Error {
   }
 }
 
-async function f1Fetch<T>(path: string, revalidate: number): Promise<MRData<T>> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    next: { revalidate },
-  });
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  if (!res.ok) {
-    throw new F1ApiError(res.status, path);
+function isRetryableStatus(status: number): boolean {
+  // 429 = rate limited, 5xx = upstream/transient failure. Everything else
+  // (404, etc.) is a real answer and retrying it would just waste time.
+  return status === 429 || status >= 500;
+}
+
+/**
+ * Fetches a single page, retrying with backoff on rate-limit (429) and
+ * transient server errors. Without this, a burst of concurrent requests
+ * (e.g. one per season of a long career) can get partially rate-limited —
+ * and if the caller swallows the error, specific seasons silently vanish
+ * from the data instead of surfacing a failure.
+ */
+async function f1Fetch<T>(path: string, revalidate: number): Promise<MRData<T>> {
+  let lastError: F1ApiError | undefined;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      next: { revalidate },
+    });
+
+    if (res.ok) {
+      return (await res.json()) as MRData<T>;
+    }
+
+    lastError = new F1ApiError(res.status, path);
+    if (!isRetryableStatus(res.status) || attempt === MAX_RETRIES) {
+      throw lastError;
+    }
+
+    const retryAfterHeader = res.headers.get("retry-after");
+    const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : NaN;
+    const delay = Number.isFinite(retryAfterMs) ? retryAfterMs : RETRY_BASE_DELAY_MS * 2 ** attempt;
+    await sleep(delay);
   }
 
-  return (await res.json()) as MRData<T>;
+  // Unreachable — the loop above always returns or throws — but keeps TS happy.
+  throw lastError;
 }
 
 /**

@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { getDriver, getDriverCareerResults, getDriverStandings } from "@/lib/f1-api";
 import { summarizeBySeasons, summarizeCareer } from "@/lib/aggregate";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import { driverName, formatDate } from "@/lib/format";
+
+/** Cap on concurrent per-season standings requests — stays comfortably under
+ * Jolpica's burst rate limit even for a 20+ season career. */
+const STANDINGS_FETCH_CONCURRENCY = 4;
 
 export default async function DriverDetailPage({
   params,
@@ -17,9 +22,13 @@ export default async function DriverDetailPage({
   const careerTotals = summarizeCareer(careerRaces);
 
   // The results endpoint doesn't return final championship position, so pull
-  // standings for each season the driver raced in and match it up.
-  const standingsPerSeason = await Promise.all(
-    seasonSummaries.map((summary) => getDriverStandings(summary.season).catch(() => [])),
+  // standings for each season the driver raced in and match it up. Fetched
+  // with capped concurrency (rather than one giant Promise.all) so a long
+  // career doesn't burst past the API's rate limit and silently lose years —
+  // f1Fetch already retries transient failures, so a season only ends up
+  // empty here if it genuinely has no standings data.
+  const standingsPerSeason = await mapWithConcurrency(seasonSummaries, STANDINGS_FETCH_CONCURRENCY, (summary) =>
+    getDriverStandings(summary.season).catch(() => []),
   );
 
   let championships = 0;
