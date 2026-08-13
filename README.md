@@ -10,7 +10,7 @@ Read-only for now: no auth, no accounts, just clean views into F1 data pulled fr
 - [Tailwind CSS](https://tailwindcss.com)
 - Data from the [Jolpica-F1 API](https://github.com/jolpica/jolpica-f1) — a free, open-source, Ergast-compatible successor to the deprecated Ergast API. No API key required.
 
-See [`docs/project-plan.md`](./docs/project-plan.md) for the full project plan (pages, data model, caching strategy, build order).
+See [`docs/project-plan.md`](./docs/project-plan.md) for the full project plan (pages, data model, caching strategy, build order), and [`docs/roadmap.md`](./docs/roadmap.md) for a menu of future improvements with implementation notes.
 
 ## Getting Started
 
