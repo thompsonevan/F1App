@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { getCircuitResults, getQualifyingResults, getRaceResults } from "@/lib/f1-api";
 import { QualifyingResultsTable, RaceResultsTable } from "@/components/ResultsTable";
 import { driverName, f1tvSearchUrl, formatDate } from "@/lib/format";
-import { getCuratedF1tvLink } from "@/lib/f1tv-links";
 
 export default async function RaceDetailPage({
   params,
@@ -24,13 +23,6 @@ export default async function RaceDetailPage({
     .filter((r) => r.season !== year)
     .sort((a, b) => Number(b.season) - Number(a.season));
 
-  // Prefer a verified direct link when one's been curated for this race;
-  // otherwise fall back to a best-effort F1TV search (see lib/f1tv-links.ts
-  // and f1tvSearchUrl for why a direct link isn't always available).
-  const curatedF1tvLink = getCuratedF1tvLink(race.season, race.Circuit.circuitId);
-  const f1tvHref = curatedF1tvLink ?? f1tvSearchUrl(race.season, race.raceName);
-  const f1tvLabel = curatedF1tvLink ? "Watch on F1TV ↗" : "Find on F1TV ↗";
-
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -45,12 +37,12 @@ export default async function RaceDetailPage({
           </p>
         </div>
         <a
-          href={f1tvHref}
+          href={f1tvSearchUrl(race.season, race.raceName)}
           target="_blank"
           rel="noopener noreferrer"
           className="shrink-0 rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
         >
-          {f1tvLabel}
+          Watch on F1TV ↗
         </a>
       </div>
 

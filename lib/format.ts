@@ -35,19 +35,17 @@ export function driverName(driver: { givenName: string; familyName: string }): s
 }
 
 /**
- * Best-effort link to F1TV's own search page for a given race. F1TV has no
- * public API or documented URL scheme for deep-linking to a specific
- * race's video — this points at F1TV's search page with the race
- * pre-filled as a query, which the visitor still has to click through
- * (and needs to be logged into an active F1TV subscription to actually
- * watch, and it may not have every historical race). The `q` param name
- * is an educated guess at a common convention, not verified against the
- * live site — network access to f1tv.formula1.com was blocked from the
- * environment this was built in. If it's wrong, the link still lands on
- * F1TV's real search page, just without the query pre-filled — check it
- * once deployed and adjust here if needed.
+ * Link to F1TV's own search page for a given race. F1TV has no public API
+ * or documented URL scheme for deep-linking to a specific race's video
+ * (there's no derivable relationship between a race and F1TV's internal
+ * page IDs), so this points at F1TV's search page with the race
+ * pre-filled as a query — the visitor still has to pick the right result,
+ * and needs to be logged into an active F1TV subscription to actually
+ * watch, and F1TV may not have every historical race. `search` is the
+ * confirmed working query param (verified against a real working F1TV
+ * search URL).
  */
 export function f1tvSearchUrl(season: string, raceName: string): string {
   const query = `${season} ${raceName}`;
-  return `https://f1tv.formula1.com/search?q=${encodeURIComponent(query)}`;
+  return `https://f1tv.formula1.com/search?search=${encodeURIComponent(query)}`;
 }
