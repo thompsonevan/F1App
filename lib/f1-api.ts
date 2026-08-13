@@ -154,10 +154,43 @@ export async function getRaceResults(year: string | number, round: string | numb
  * Used to count race starts per driver — standings only carry points/wins,
  * not a per-driver races-entered count, so this is the cheapest way to get
  * that without a fetch per driver.
+ *
+ * The API paginates over the flat list of individual result rows, not by
+ * race — `limit=100` rarely divides evenly into ~20-driver grids, so a
+ * race can straddle a page boundary. Each page still groups its rows into
+ * a `Race` container by round, so a split race comes back as two separate
+ * entries for the same round, each holding only part of its grid — the
+ * first entry might be P1-P12, say, and the second P13-P20. Anything that
+ * naively took "the Results for round N" (a Map keyed by round, last one
+ * wins) would silently pick up whichever fragment happened to land last,
+ * which is exactly how a race list ended up showing P13-P15 as the
+ * "podium". This reassembles same-round fragments before returning, so
+ * every caller always gets one complete, correctly-ordered Results array
+ * per round.
  */
 export async function getSeasonResults(year: string | number): Promise<Race[]> {
   const revalidate = isPastSeason(year) ? REVALIDATE_LONG : REVALIDATE_SHORT;
-  return f1FetchAllPages<RaceTable, Race>(`/${year}/results.json`, revalidate, (page) => page.MRData.RaceTable.Races);
+  const rawRaces = await f1FetchAllPages<RaceTable, Race>(
+    `/${year}/results.json`,
+    revalidate,
+    (page) => page.MRData.RaceTable.Races,
+  );
+
+  const byRound = new Map<string, Race>();
+  for (const race of rawRaces) {
+    const existing = byRound.get(race.round);
+    if (!existing) {
+      byRound.set(race.round, { ...race, Results: race.Results ? [...race.Results] : race.Results });
+      continue;
+    }
+    existing.Results = [...(existing.Results ?? []), ...(race.Results ?? [])];
+  }
+
+  for (const race of byRound.values()) {
+    race.Results?.sort((a, b) => Number(a.position) - Number(b.position));
+  }
+
+  return Array.from(byRound.values()).sort((a, b) => Number(a.round) - Number(b.round));
 }
 
 /**
