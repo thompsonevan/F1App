@@ -6,6 +6,7 @@
  */
 
 import type { Race } from "./types";
+import { driverName } from "./format";
 
 export interface SeasonSummary {
   season: string;
@@ -74,6 +75,89 @@ export function summarizeCareer(careerRaces: Race[]): CareerTotals {
     // Starting grid position 1 is a pole; race-day grid penalties are rare
     // enough that this is a reasonable stand-in for a dedicated poles endpoint.
     if (result.grid === "1") totals.poles += 1;
+    seasons.add(race.season);
+  }
+
+  totals.seasons = Array.from(seasons).sort((a, b) => Number(a) - Number(b));
+  return totals;
+}
+
+export interface ConstructorSeasonSummary {
+  season: string;
+  driverNames: string[];
+  races: number;
+  wins: number;
+  podiums: number;
+  points: number;
+  /** Final championship position for the season, filled in separately from standings. */
+  finalPosition?: string;
+}
+
+export interface ConstructorCareerTotals {
+  races: number;
+  wins: number;
+  podiums: number;
+  points: number;
+  seasons: string[];
+}
+
+/**
+ * Groups a constructor's career results by season, in season order.
+ *
+ * Unlike a driver's results (one entry per race), a constructor's `Race`
+ * carries one `Results` entry per car it fielded that race — so `races` is
+ * counted once per race regardless of how many cars started, while wins,
+ * podiums, and points are summed across every entry (a 1-2 finish is one
+ * win but two podiums, matching how these totals are conventionally
+ * reported).
+ */
+export function summarizeConstructorBySeasons(careerRaces: Race[]): ConstructorSeasonSummary[] {
+  const bySeason = new Map<string, ConstructorSeasonSummary>();
+
+  for (const race of careerRaces) {
+    const entries = race.Results ?? [];
+    if (entries.length === 0) continue;
+
+    const summary = bySeason.get(race.season) ?? {
+      season: race.season,
+      driverNames: [],
+      races: 0,
+      wins: 0,
+      podiums: 0,
+      points: 0,
+    };
+
+    summary.races += 1;
+    for (const entry of entries) {
+      summary.points += Number(entry.points) || 0;
+      if (entry.position === "1") summary.wins += 1;
+      if (Number(entry.position) <= 3) summary.podiums += 1;
+
+      const name = driverName(entry.Driver);
+      if (!summary.driverNames.includes(name)) summary.driverNames.push(name);
+    }
+
+    bySeason.set(race.season, summary);
+  }
+
+  return Array.from(bySeason.values()).sort((a, b) => Number(a.season) - Number(b.season));
+}
+
+/** All-time totals aggregated across every race a constructor has ever entered. */
+export function summarizeConstructorCareer(careerRaces: Race[]): ConstructorCareerTotals {
+  const totals: ConstructorCareerTotals = { races: 0, wins: 0, podiums: 0, points: 0, seasons: [] };
+  const seasons = new Set<string>();
+
+  for (const race of careerRaces) {
+    const entries = race.Results ?? [];
+    if (entries.length === 0) continue;
+
+    totals.races += 1;
+    for (const entry of entries) {
+      totals.points += Number(entry.points) || 0;
+      if (entry.position === "1") totals.wins += 1;
+      if (Number(entry.position) <= 3) totals.podiums += 1;
+    }
     seasons.add(race.season);
   }
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllDrivers, getAllSeasons, getCurrentSeasonSchedule } from "@/lib/f1-api";
+import { getAllConstructors, getAllDrivers, getAllSeasons, getCurrentSeasonSchedule } from "@/lib/f1-api";
 import { driverName } from "@/lib/format";
 
 export interface SearchResult {
-  type: "driver" | "race" | "season";
+  type: "driver" | "race" | "season" | "team";
   id: string;
   label: string;
   sub?: string;
@@ -13,6 +13,7 @@ export interface SearchResult {
 export interface SearchResponse {
   drivers: SearchResult[];
   races: SearchResult[];
+  teams: SearchResult[];
   seasons: SearchResult[];
 }
 
@@ -22,14 +23,15 @@ export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? "";
 
   if (query.length === 0) {
-    return NextResponse.json<SearchResponse>({ drivers: [], races: [], seasons: [] });
+    return NextResponse.json<SearchResponse>({ drivers: [], races: [], teams: [], seasons: [] });
   }
 
   // Each of these hits lib/f1-api's own fetch cache, so beyond the very
   // first search after a deploy this is served from cache, not a live
   // round trip to Jolpica on every keystroke.
-  const [drivers, seasons, currentSeasonRaces] = await Promise.all([
+  const [drivers, constructors, seasons, currentSeasonRaces] = await Promise.all([
     getAllDrivers().catch(() => []),
+    getAllConstructors().catch(() => []),
     getAllSeasons().catch(() => []),
     getCurrentSeasonSchedule().catch(() => []),
   ]);
@@ -48,6 +50,22 @@ export async function GET(request: NextRequest) {
       label: driverName(driver),
       sub: driver.nationality,
       href: `/drivers/${driver.driverId}`,
+    }));
+
+  const matchedTeams: SearchResult[] = constructors
+    .filter(
+      (constructor) =>
+        constructor.name.toLowerCase().includes(query) ||
+        constructor.nationality.toLowerCase().includes(query) ||
+        constructor.constructorId.toLowerCase().includes(query),
+    )
+    .slice(0, RESULTS_PER_GROUP)
+    .map((constructor) => ({
+      type: "team",
+      id: constructor.constructorId,
+      label: constructor.name,
+      sub: constructor.nationality,
+      href: `/teams/${constructor.constructorId}`,
     }));
 
   const matchedSeasons: SearchResult[] = seasons
@@ -84,6 +102,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json<SearchResponse>({
     drivers: matchedDrivers,
     races: matchedRaces,
+    teams: matchedTeams,
     seasons: matchedSeasons,
   });
 }

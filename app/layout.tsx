@@ -23,6 +23,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/races", label: "Races" },
   { href: "/drivers", label: "Drivers" },
+  { href: "/teams", label: "Teams" },
   { href: "/seasons", label: "Seasons" },
 ];
 

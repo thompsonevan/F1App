@@ -11,6 +11,7 @@
 
 import type {
   CircuitTable,
+  Constructor,
   ConstructorTable,
   Driver,
   DriverTable,
@@ -242,9 +243,38 @@ export async function getAllSeasons(): Promise<Season[]> {
   return f1FetchAllPages<SeasonTable, Season>("/seasons.json", REVALIDATE_LONG, (page) => page.MRData.SeasonTable.Seasons);
 }
 
-export async function getConstructors() {
+// ---------------------------------------------------------------------------
+// Constructors (teams)
+// ---------------------------------------------------------------------------
+
+/** Current grid (all constructors active this season). */
+export async function getCurrentConstructors(): Promise<Constructor[]> {
   const data = await f1Fetch<ConstructorTable>("/current/constructors.json?limit=100", REVALIDATE_SHORT);
   return data.MRData.ConstructorTable.Constructors;
+}
+
+/** Full historical constructor list (paginated — every team since 1950). */
+export async function getAllConstructors(): Promise<Constructor[]> {
+  return f1FetchAllPages<ConstructorTable, Constructor>(
+    "/constructors.json",
+    REVALIDATE_LONG,
+    (page) => page.MRData.ConstructorTable.Constructors,
+  );
+}
+
+/** Info (name, nationality) for a single constructor. */
+export async function getConstructor(constructorId: string) {
+  const data = await f1Fetch<ConstructorTable>(`/constructors/${constructorId}.json`, REVALIDATE_LONG);
+  return data.MRData.ConstructorTable.Constructors[0] ?? null;
+}
+
+/** Every race + results for a constructor's entire history (paginated). */
+export async function getConstructorCareerResults(constructorId: string): Promise<Race[]> {
+  return f1FetchAllPages<RaceTable, Race>(
+    `/constructors/${constructorId}/results.json`,
+    REVALIDATE_LONG,
+    (page) => page.MRData.RaceTable.Races,
+  );
 }
 
 // ---------------------------------------------------------------------------

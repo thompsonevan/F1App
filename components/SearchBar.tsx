@@ -6,11 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SearchResponse, SearchResult } from "@/app/api/search/route";
 
 const DEBOUNCE_MS = 200;
-const EMPTY_RESULTS: SearchResponse = { drivers: [], races: [], seasons: [] };
+const EMPTY_RESULTS: SearchResponse = { drivers: [], races: [], teams: [], seasons: [] };
 
 const GROUPS: { key: keyof SearchResponse; label: string }[] = [
   { key: "drivers", label: "Drivers" },
   { key: "races", label: "Races" },
+  { key: "teams", label: "Teams" },
   { key: "seasons", label: "Seasons" },
 ];
 
@@ -25,8 +26,10 @@ export default function SearchBar() {
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
+  // Order must match GROUPS above — it's what keyboard nav walks through
+  // and what the `indexOf` lookup below relies on to line up with the UI.
   const flatResults = useMemo<SearchResult[]>(
-    () => [...results.drivers, ...results.races, ...results.seasons],
+    () => [...results.drivers, ...results.races, ...results.teams, ...results.seasons],
     [results],
   );
 
@@ -125,8 +128,8 @@ export default function SearchBar() {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
-        placeholder="Search drivers, races, seasons…"
-        aria-label="Search drivers, races, and seasons"
+        placeholder="Search drivers, races, teams, seasons…"
+        aria-label="Search drivers, races, teams, and seasons"
         role="combobox"
         aria-expanded={showDropdown}
         aria-controls="search-results-listbox"
