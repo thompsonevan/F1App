@@ -82,6 +82,53 @@ export function summarizeCareer(careerRaces: Race[]): CareerTotals {
   return totals;
 }
 
+export interface DriverSeasonRaceResult {
+  round: string;
+  raceName: string;
+  date: string;
+  grid: string;
+  positionText: string;
+  time?: string;
+  status: string;
+  points: string;
+}
+
+/**
+ * Every race result for a driver, grouped by season and sorted by round —
+ * the round-by-round detail behind the season-by-season summary above.
+ * Built from the same `careerRaces` already fetched for that summary, so
+ * showing a season's race-by-race breakdown needs no extra API calls.
+ */
+export function groupDriverRacesBySeason(careerRaces: Race[]): Map<string, DriverSeasonRaceResult[]> {
+  const bySeason = new Map<string, DriverSeasonRaceResult[]>();
+
+  for (const race of careerRaces) {
+    const result = race.Results?.[0];
+    if (!result) continue;
+
+    const entry: DriverSeasonRaceResult = {
+      round: race.round,
+      raceName: race.raceName,
+      date: race.date,
+      grid: result.grid,
+      positionText: result.positionText,
+      time: result.Time?.time,
+      status: result.status,
+      points: result.points,
+    };
+
+    const seasonRaces = bySeason.get(race.season) ?? [];
+    seasonRaces.push(entry);
+    bySeason.set(race.season, seasonRaces);
+  }
+
+  for (const races of bySeason.values()) {
+    races.sort((a, b) => Number(a.round) - Number(b.round));
+  }
+
+  return bySeason;
+}
+
 export interface ConstructorNamePeriod {
   name: string;
   fromSeason: string;

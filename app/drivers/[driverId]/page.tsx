@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDriver, getDriverCareerResults, getDriverStandings } from "@/lib/f1-api";
-import { summarizeBySeasons, summarizeCareer } from "@/lib/aggregate";
+import { groupDriverRacesBySeason, summarizeBySeasons, summarizeCareer } from "@/lib/aggregate";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { driverName, formatDate } from "@/lib/format";
+import DriverSeasonExplorer from "@/components/DriverSeasonExplorer";
 
 /** Cap on concurrent per-season standings requests, plus a stagger between
  * each slot's start — kept conservative on purpose. A long career means a
@@ -50,8 +52,8 @@ export default async function DriverDetailPage({
     }
   });
 
-  const currentYear = new Date().getFullYear().toString();
-  const currentSeason = seasonSummaries.find((s) => s.season === currentYear);
+  const racesBySeason = Object.fromEntries(groupDriverRacesBySeason(careerRaces));
+  const mostRecentSeason = seasonSummaries[seasonSummaries.length - 1]?.season;
 
   return (
     <div className="flex flex-col gap-8">
@@ -64,19 +66,13 @@ export default async function DriverDetailPage({
         </p>
       </div>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Current Season</h2>
-        {currentSeason ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat label="Position" value={currentSeason.finalPosition ?? "—"} />
-            <Stat label="Points" value={currentSeason.points} />
-            <Stat label="Wins" value={currentSeason.wins} />
-            <Stat label="Podiums" value={currentSeason.podiums} />
-          </div>
-        ) : (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Not competing this season.</p>
-        )}
-      </section>
+      {mostRecentSeason && (
+        <DriverSeasonExplorer
+          seasons={seasonSummaries}
+          racesBySeason={racesBySeason}
+          defaultSeason={mostRecentSeason}
+        />
+      )}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Season by Season</h2>
@@ -97,7 +93,11 @@ export default async function DriverDetailPage({
                 .reverse()
                 .map((summary) => (
                   <tr key={summary.season} className="hover:bg-black/[.02] dark:hover:bg-white/[.03]">
-                    <td className="px-4 py-2 font-medium">{summary.season}</td>
+                    <td className="px-4 py-2 font-medium">
+                      <Link href={`/seasons/${summary.season}`} className="hover:underline">
+                        {summary.season}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">
                       {summary.constructorNames.join(" / ")}
                     </td>
