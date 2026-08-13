@@ -11,13 +11,23 @@ import StandingsTable from "@/components/StandingsTable";
 const PAGE_SIZE = 50;
 
 type View = "current" | "byYear" | "allTime";
-type SortField = "name" | "debutSeason" | "lastSeason" | "championships" | "wins" | "points";
+type SortField =
+  | "name"
+  | "debutSeason"
+  | "lastSeason"
+  | "seasonsRaced"
+  | "championships"
+  | "raceStarts"
+  | "wins"
+  | "points";
 
 const SORT_LABELS: Record<SortField, string> = {
   name: "Name",
   debutSeason: "Debut",
   lastSeason: "Last Season",
+  seasonsRaced: "Years Raced",
   championships: "Championships",
+  raceStarts: "Race Starts",
   wins: "Wins",
   points: "Points",
 };
@@ -80,8 +90,12 @@ export default function DriverExplorer({ currentStandings }: { currentStandings:
           return (Number(a.debutSeason) - Number(b.debutSeason)) * dir;
         case "lastSeason":
           return (Number(a.lastSeason) - Number(b.lastSeason)) * dir;
+        case "seasonsRaced":
+          return (a.seasonsRaced - b.seasonsRaced) * dir;
         case "championships":
           return (a.championships - b.championships) * dir;
+        case "raceStarts":
+          return (a.raceStarts - b.raceStarts) * dir;
         case "wins":
           return (a.wins - b.wins) * dir;
         case "points":
@@ -187,10 +201,26 @@ export default function DriverExplorer({ currentStandings }: { currentStandings:
                     sortDir={sortDir}
                     onSort={toggleSort}
                   />
+                  <SortableHeader
+                    field="seasonsRaced"
+                    label="Years"
+                    align="right"
+                    sortField={sortField}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
                   <th className="px-4 py-2">Status</th>
                   <SortableHeader
                     field="championships"
                     label="Titles"
+                    align="right"
+                    sortField={sortField}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <SortableHeader
+                    field="raceStarts"
+                    label="Starts"
                     align="right"
                     sortField={sortField}
                     sortDir={sortDir}
@@ -264,6 +294,7 @@ function DriverRow({ driver }: { driver: DriverDirectoryEntry }) {
         <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{driver.nationality}</span>
       </td>
       <td className="px-4 py-2">{driver.debutSeason}</td>
+      <td className="px-4 py-2 text-right">{driver.seasonsRaced}</td>
       <td className="px-4 py-2">
         {driver.isCurrent ? (
           <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400">
@@ -274,6 +305,7 @@ function DriverRow({ driver }: { driver: DriverDirectoryEntry }) {
         )}
       </td>
       <td className="px-4 py-2 text-right">{driver.championships || "—"}</td>
+      <td className="px-4 py-2 text-right">{driver.raceStarts}</td>
       <td className="px-4 py-2 text-right">{driver.wins}</td>
       <td className="px-4 py-2 text-right font-medium">{driver.points}</td>
     </tr>

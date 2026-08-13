@@ -263,6 +263,9 @@ export interface DriverDirectoryEntry {
   debutSeason: string;
   lastSeason: string;
   isCurrent: boolean;
+  seasonsRaced: number;
+  /** Filled in separately by mergeRaceStarts — 0 until then. */
+  raceStarts: number;
   wins: number;
   points: number;
   championships: number;
@@ -282,7 +285,9 @@ export interface DriverDirectoryEntry {
  * already season totals there, and a championship is just finishing that
  * season in position "1"), so summing/counting across every season a
  * driver appeared in gives accurate career totals with no per-driver
- * fetch at all.
+ * fetch at all. `seasonsRaced` counts distinct seasons the driver actually
+ * appeared in standings for — not (lastSeason - debutSeason + 1), which
+ * would wrongly count any gap years as raced.
  */
 export function buildDriverDirectory(
   standingsBySeason: Map<string, DriverStanding[]>,
@@ -300,6 +305,8 @@ export function buildDriverDirectory(
         debutSeason: season,
         lastSeason: season,
         isCurrent: false,
+        seasonsRaced: 0,
+        raceStarts: 0,
         wins: 0,
         points: 0,
         championships: 0,
@@ -307,6 +314,7 @@ export function buildDriverDirectory(
 
       if (Number(season) < Number(entry.debutSeason)) entry.debutSeason = season;
       if (Number(season) > Number(entry.lastSeason)) entry.lastSeason = season;
+      entry.seasonsRaced += 1;
       entry.wins += Number(standing.wins) || 0;
       entry.points += Number(standing.points) || 0;
       if (standing.position === "1") entry.championships += 1;
@@ -320,4 +328,30 @@ export function buildDriverDirectory(
   }
 
   return Array.from(byDriver.values());
+}
+
+/**
+ * Counts race starts per driver from a combined set of season-wide race
+ * results (see getSeasonResults). One entry in a race's `Results` array is
+ * one start, so this is a straight tally — race-level data is the only
+ * source with per-driver start counts at all; standings don't carry it.
+ */
+export function countRaceStartsByDriver(allRaces: Race[]): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const race of allRaces) {
+    for (const result of race.Results ?? []) {
+      const id = result.Driver.driverId;
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+
+  return counts;
+}
+
+/** Fills in `raceStarts` on each directory entry from a driverId -> count map. */
+export function mergeRaceStarts(directory: DriverDirectoryEntry[], raceStartsByDriver: Map<string, number>): void {
+  for (const entry of directory) {
+    entry.raceStarts = raceStartsByDriver.get(entry.driverId) ?? 0;
+  }
 }

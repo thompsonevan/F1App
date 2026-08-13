@@ -113,7 +113,8 @@ export default async function DriverDetailPage({
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Career Totals</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
+          <Stat label="Seasons" value={careerTotals.seasons.length} />
           <Stat label="Races" value={careerTotals.races} />
           <Stat label="Wins" value={careerTotals.wins} />
           <Stat label="Podiums" value={careerTotals.podiums} />

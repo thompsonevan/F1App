@@ -149,6 +149,17 @@ export async function getRaceResults(year: string | number, round: string | numb
   return data.MRData.RaceTable.Races[0] ?? null;
 }
 
+/**
+ * Every race's full results for an entire season (all rounds), paginated.
+ * Used to count race starts per driver — standings only carry points/wins,
+ * not a per-driver races-entered count, so this is the cheapest way to get
+ * that without a fetch per driver.
+ */
+export async function getSeasonResults(year: string | number): Promise<Race[]> {
+  const revalidate = isPastSeason(year) ? REVALIDATE_LONG : REVALIDATE_SHORT;
+  return f1FetchAllPages<RaceTable, Race>(`/${year}/results.json`, revalidate, (page) => page.MRData.RaceTable.Races);
+}
+
 /** Qualifying results (grid) for a single race. */
 export async function getQualifyingResults(year: string | number, round: string | number): Promise<Race | null> {
   const revalidate = isPastSeason(year) ? REVALIDATE_LONG : REVALIDATE_SHORT;
