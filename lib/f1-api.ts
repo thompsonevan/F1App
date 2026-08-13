@@ -160,6 +160,20 @@ export async function getSeasonResults(year: string | number): Promise<Race[]> {
   return f1FetchAllPages<RaceTable, Race>(`/${year}/results.json`, revalidate, (page) => page.MRData.RaceTable.Races);
 }
 
+/**
+ * Merges results into a season's schedule by round, so a race list can show
+ * podium info without a click-through to the race's own page. A race that
+ * hasn't happened yet (or whose results fetch failed/came back empty)
+ * simply keeps no Results — RaceCard treats that as "not decided yet".
+ */
+export function mergeRaceResults(schedule: Race[], results: Race[]): Race[] {
+  const resultsByRound = new Map(results.map((r) => [r.round, r.Results]));
+  return schedule.map((race) => ({
+    ...race,
+    Results: resultsByRound.get(race.round) ?? race.Results,
+  }));
+}
+
 /** Qualifying results (grid) for a single race. */
 export async function getQualifyingResults(year: string | number, round: string | number): Promise<Race | null> {
   const revalidate = isPastSeason(year) ? REVALIDATE_LONG : REVALIDATE_SHORT;

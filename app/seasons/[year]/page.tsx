@@ -1,5 +1,11 @@
 import { notFound } from "next/navigation";
-import { getConstructorStandings, getDriverStandings, getSeasonSchedule } from "@/lib/f1-api";
+import {
+  getConstructorStandings,
+  getDriverStandings,
+  getSeasonResults,
+  getSeasonSchedule,
+  mergeRaceResults,
+} from "@/lib/f1-api";
 import RaceCard from "@/components/RaceCard";
 import StandingsTable from "@/components/StandingsTable";
 
@@ -13,10 +19,13 @@ export default async function SeasonDetailPage({
 
   if (!schedule || schedule.length === 0) notFound();
 
-  const [driverStandings, constructorStandings] = await Promise.all([
+  const [driverStandings, constructorStandings, results] = await Promise.all([
     getDriverStandings(year).catch(() => []),
     getConstructorStandings(year).catch(() => []),
+    getSeasonResults(year).catch(() => []),
   ]);
+
+  const races = mergeRaceResults(schedule, results);
 
   return (
     <div className="flex flex-col gap-8">
@@ -47,7 +56,7 @@ export default async function SeasonDetailPage({
       <section>
         <h2 className="mb-3 text-lg font-semibold">Calendar</h2>
         <div className="flex flex-col gap-2">
-          {schedule.map((race) => (
+          {races.map((race) => (
             <RaceCard key={`${race.season}-${race.round}`} race={race} />
           ))}
         </div>

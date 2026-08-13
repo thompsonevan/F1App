@@ -2,11 +2,14 @@ import Link from "next/link";
 import type { Race } from "@/lib/types";
 import { formatDate, raceDateTime } from "@/lib/format";
 
+const MEDALS = ["🥇", "🥈", "🥉"];
+
 export default function RaceCard({ race }: { race: Race }) {
   // Every page that renders this card is dynamic, so it re-executes fresh
   // per request — comparing against the current time here is intentional.
   // eslint-disable-next-line react-hooks/purity
   const isCompleted = raceDateTime(race.date, race.time).getTime() < Date.now();
+  const podium = race.Results?.slice(0, 3) ?? [];
 
   return (
     <Link
@@ -22,6 +25,15 @@ export default function RaceCard({ race }: { race: Race }) {
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {race.Circuit.circuitName} · {race.Circuit.Location.locality}, {race.Circuit.Location.country}
           </p>
+          {podium.length > 0 && (
+            <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-zinc-700 dark:text-zinc-300">
+              {podium.map((result, i) => (
+                <span key={result.Driver.driverId}>
+                  {MEDALS[i]} {result.Driver.familyName}
+                </span>
+              ))}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

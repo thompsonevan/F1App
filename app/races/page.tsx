@@ -1,4 +1,4 @@
-import { getAllSeasons, getCurrentSeasonSchedule, getSeasonSchedule } from "@/lib/f1-api";
+import { getAllSeasons, getCurrentSeasonSchedule, getSeasonResults, getSeasonSchedule, mergeRaceResults } from "@/lib/f1-api";
 import RaceCard from "@/components/RaceCard";
 import RaceYearSelector from "@/components/RaceYearSelector";
 
@@ -11,11 +11,13 @@ export default async function RacesPage({
 }) {
   const { year } = await searchParams;
 
-  const [seasons, schedule] = await Promise.all([
+  const [seasons, schedule, results] = await Promise.all([
     getAllSeasons(),
     year ? getSeasonSchedule(year) : getCurrentSeasonSchedule(),
+    getSeasonResults(year ?? "current").catch(() => []),
   ]);
 
+  const races = mergeRaceResults(schedule, results);
   const seasonYears = seasons.map((s) => s.season).sort((a, b) => Number(b) - Number(a));
   const selectedYear = year ?? schedule[0]?.season ?? seasonYears[0] ?? "";
 
@@ -33,7 +35,7 @@ export default async function RacesPage({
         {seasonYears.length > 0 && <RaceYearSelector years={seasonYears} selected={selectedYear} />}
       </div>
       <div className="flex flex-col gap-2">
-        {schedule.map((race) => (
+        {races.map((race) => (
           <RaceCard key={`${race.season}-${race.round}`} race={race} />
         ))}
       </div>
