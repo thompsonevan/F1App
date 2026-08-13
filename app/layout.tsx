@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import SearchBar from "@/components/SearchBar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,11 +34,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-black">
         <header className="border-b border-black/10 bg-white dark:border-white/10 dark:bg-zinc-950">
-          <nav className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-4">
-            <Link href="/" className="text-lg font-bold tracking-tight">
+          <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 px-6 py-4 sm:flex-nowrap sm:gap-6">
+            <Link href="/" className="shrink-0 text-lg font-bold tracking-tight">
               🏎️ F1 Dashboard
             </Link>
-            <div className="flex gap-4 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            <div className="order-last w-full sm:order-none sm:w-auto sm:flex-1">
+              <SearchBar />
+            </div>
+            <div className="flex shrink-0 gap-4 text-sm font-medium text-zinc-600 dark:text-zinc-400">
               {NAV_LINKS.slice(1).map((link) => (
                 <Link key={link.href} href={link.href} className="hover:text-black dark:hover:text-white">
                   {link.label}
