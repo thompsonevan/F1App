@@ -265,19 +265,24 @@ export interface DriverDirectoryEntry {
   isCurrent: boolean;
   wins: number;
   points: number;
+  championships: number;
 }
 
 /**
  * Builds a roster of every driver who has ever appeared in a season's
- * final standings, with career wins/points and their first/last season.
+ * final standings, with career wins/points/championships and their
+ * first/last season.
  *
  * This deliberately avoids the one thing it can't cheaply do: podiums and
  * poles aren't in standings data at all (only position/points/wins are),
  * and getting them for every driver in F1 history would mean a full
  * race-results fetch per driver — 860+ requests, not feasible on a single
- * page load. Wins and points, though, are already *season* totals in each
- * standings entry, so summing them across every season a driver appeared
- * in gives an accurate career total with no per-driver fetch at all.
+ * page load. Wins, points, and championships, though, are all derivable
+ * straight from each season's final standings entry (points/wins are
+ * already season totals there, and a championship is just finishing that
+ * season in position "1"), so summing/counting across every season a
+ * driver appeared in gives accurate career totals with no per-driver
+ * fetch at all.
  */
 export function buildDriverDirectory(
   standingsBySeason: Map<string, DriverStanding[]>,
@@ -297,12 +302,14 @@ export function buildDriverDirectory(
         isCurrent: false,
         wins: 0,
         points: 0,
+        championships: 0,
       };
 
       if (Number(season) < Number(entry.debutSeason)) entry.debutSeason = season;
       if (Number(season) > Number(entry.lastSeason)) entry.lastSeason = season;
       entry.wins += Number(standing.wins) || 0;
       entry.points += Number(standing.points) || 0;
+      if (standing.position === "1") entry.championships += 1;
 
       byDriver.set(id, entry);
     }
