@@ -59,7 +59,11 @@ export default function StandingsTable(props: StandingsTableProps) {
                 return (
                   <tr key={s.Constructor.constructorId} className="hover:bg-black/[.02] dark:hover:bg-white/[.03]">
                     <td className="px-4 py-2 font-medium">{s.position}</td>
-                    <td className="px-4 py-2">{s.Constructor.name}</td>
+                    <td className="px-4 py-2">
+                      <Link href={`/teams/${s.Constructor.constructorId}`} className="hover:underline">
+                        {s.Constructor.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2 text-right">{s.wins}</td>
                     <td className="px-4 py-2 text-right font-medium">{s.points}</td>
                   </tr>
