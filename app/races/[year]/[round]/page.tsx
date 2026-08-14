@@ -1,8 +1,25 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCircuitResults, getQualifyingResults, getRaceResults } from "@/lib/f1-api";
 import { QualifyingResultsTable, RaceResultsTable } from "@/components/ResultsTable";
 import { driverName, f1tvSearchUrl, formatDate } from "@/lib/format";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ year: string; round: string }>;
+}): Promise<Metadata> {
+  const { year, round } = await params;
+  // Same call as the page component below — deduped by Next's fetch cache.
+  const race = await getRaceResults(year, round);
+  if (!race) return {};
+
+  return {
+    title: `${race.raceName} ${race.season}`,
+    description: `${race.raceName} (${race.season}) at ${race.Circuit.circuitName} — results, qualifying, and circuit history.`,
+  };
+}
 
 export default async function RaceDetailPage({
   params,

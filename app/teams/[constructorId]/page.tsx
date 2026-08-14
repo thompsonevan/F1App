@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getConstructor, getConstructorCareerResults, getConstructorStandings } from "@/lib/f1-api";
@@ -13,6 +14,22 @@ import { mapWithConcurrency } from "@/lib/concurrency";
  * slower load, but that's preferable to tripping Jolpica's rate limit. */
 const STANDINGS_FETCH_CONCURRENCY = 2;
 const STANDINGS_FETCH_STAGGER_MS = 150;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ constructorId: string }>;
+}): Promise<Metadata> {
+  const { constructorId } = await params;
+  // Same call as the page component below — deduped by Next's fetch cache.
+  const constructor = await getConstructor(constructorId);
+  if (!constructor) return {};
+
+  return {
+    title: constructor.name,
+    description: `${constructor.name} — F1 constructor stats, season-by-season results, and all-time totals.`,
+  };
+}
 
 export default async function TeamDetailPage({
   params,

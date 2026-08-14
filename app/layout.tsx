@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "F1 Dashboard",
+  title: {
+    default: "F1 Dashboard",
+    template: "%s | F1 Dashboard",
+  },
   description: "Formula 1 race, driver, and standings data — current and historical.",
 };
 

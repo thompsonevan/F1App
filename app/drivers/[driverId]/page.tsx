@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDriver, getDriverCareerResults, getDriverStandings } from "@/lib/f1-api";
@@ -11,6 +12,23 @@ import DriverSeasonExplorer from "@/components/DriverSeasonExplorer";
  * slower load, but that's preferable to tripping Jolpica's rate limit. */
 const STANDINGS_FETCH_CONCURRENCY = 2;
 const STANDINGS_FETCH_STAGGER_MS = 150;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ driverId: string }>;
+}): Promise<Metadata> {
+  const { driverId } = await params;
+  // Same call as the page component below — Next dedupes identical fetches
+  // within a render pass, so this doesn't cost a second round trip.
+  const driver = await getDriver(driverId);
+  if (!driver) return {};
+
+  return {
+    title: driverName(driver),
+    description: `${driverName(driver)} — F1 career stats, season-by-season results, and career totals.`,
+  };
+}
 
 export default async function DriverDetailPage({
   params,

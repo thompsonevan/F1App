@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   getConstructorStandings,
@@ -8,6 +9,18 @@ import {
 } from "@/lib/f1-api";
 import RaceCard from "@/components/RaceCard";
 import StandingsTable from "@/components/StandingsTable";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ year: string }>;
+}): Promise<Metadata> {
+  const { year } = await params;
+  return {
+    title: `${year} Season`,
+    description: `${year} F1 season — final driver and constructor standings, and the full race calendar.`,
+  };
+}
 
 export default async function SeasonDetailPage({
   params,
