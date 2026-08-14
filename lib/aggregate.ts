@@ -5,7 +5,7 @@
  * `Results` array for that driver).
  */
 
-import type { DriverStanding, Race } from "./types";
+import type { ConstructorStanding, DriverStanding, Race } from "./types";
 import { driverName } from "./format";
 
 export interface SeasonSummary {
@@ -354,6 +354,79 @@ export function mergeRaceStarts(directory: DriverDirectoryEntry[], raceStartsByD
   for (const entry of directory) {
     entry.raceStarts = raceStartsByDriver.get(entry.driverId) ?? 0;
   }
+}
+
+export interface ConstructorDirectoryEntry {
+  constructorId: string;
+  name: string;
+  nationality: string;
+  debutSeason: string;
+  lastSeason: string;
+  isCurrent: boolean;
+  seasonsRaced: number;
+  wins: number;
+  points: number;
+  championships: number;
+}
+
+/**
+ * Builds a roster of every constructor who has ever appeared in a season's
+ * final standings, with career wins/points/championships and their
+ * first/last season — the constructor equivalent of buildDriverDirectory.
+ *
+ * Cheaper than the driver version, deliberately: standings already carry
+ * everything needed here (wins, points, and a championship is just
+ * finishing a season in position "1"), with no analogous "race starts"
+ * column — that would need a full per-season race-results sweep (the
+ * expensive half of the driver directory's own build), and isn't worth it
+ * just for a constructor headcount that's already visible as
+ * `seasonsRaced`.
+ *
+ * `standingsBySeason` must be built from seasons in ascending order (see
+ * app/api/teams/history/route.ts) — `name` is overwritten on every season a
+ * constructor appears in, so the last (most recent) write wins, matching
+ * what /teams/[constructorId] itself shows for a constructor that changed
+ * display name under the same id over time (e.g. Sauber -> Kick Sauber).
+ */
+export function buildConstructorDirectory(
+  standingsBySeason: Map<string, ConstructorStanding[]>,
+  currentSeason: string,
+): ConstructorDirectoryEntry[] {
+  const byConstructor = new Map<string, ConstructorDirectoryEntry>();
+
+  for (const [season, standings] of standingsBySeason) {
+    for (const standing of standings) {
+      const id = standing.Constructor.constructorId;
+      const entry = byConstructor.get(id) ?? {
+        constructorId: id,
+        name: standing.Constructor.name,
+        nationality: standing.Constructor.nationality,
+        debutSeason: season,
+        lastSeason: season,
+        isCurrent: false,
+        seasonsRaced: 0,
+        wins: 0,
+        points: 0,
+        championships: 0,
+      };
+
+      if (Number(season) < Number(entry.debutSeason)) entry.debutSeason = season;
+      if (Number(season) > Number(entry.lastSeason)) entry.lastSeason = season;
+      entry.seasonsRaced += 1;
+      entry.wins += Number(standing.wins) || 0;
+      entry.points += Number(standing.points) || 0;
+      if (standing.position === "1") entry.championships += 1;
+      entry.name = standing.Constructor.name;
+
+      byConstructor.set(id, entry);
+    }
+  }
+
+  for (const entry of byConstructor.values()) {
+    entry.isCurrent = entry.lastSeason === currentSeason;
+  }
+
+  return Array.from(byConstructor.values());
 }
 
 export interface ConstructorProgressionRound {
