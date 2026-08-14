@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { getAllConstructors, getConstructorStandings } from "@/lib/f1-api";
 import StandingsTable from "@/components/StandingsTable";
-import { lineageFor, TEAM_LINEAGES } from "@/lib/team-lineage";
 
 export const dynamic = "force-dynamic";
 
@@ -12,22 +11,13 @@ export default async function TeamsPage() {
   ]);
 
   const activeIds = new Set(currentStandings.map((standing) => standing.Constructor.constructorId));
-  const constructorById = new Map(allConstructors.map((c) => [c.constructorId, c]));
-  const formerIds = new Set(TEAM_LINEAGES.flatMap((lineage) => lineage.formerIds));
 
-  // Former identities (Jordan, Midland, Spyker, ...) don't get their own
-  // row — they roll up into their team's current entry, shown there as
-  // "Formerly ...". See lib/team-lineage.ts for how that mapping works.
+  // Every constructorId gets its own row — no team-lineage rollup for now.
+  // See lib/team-lineage.ts, which still has the hand-curated mapping if
+  // this gets re-wired later.
   const teamEntries = allConstructors
-    .filter((constructor) => !formerIds.has(constructor.constructorId))
-    .map((constructor) => {
-      const lineage = lineageFor(constructor.constructorId);
-      const formerNames = (lineage?.formerIds ?? [])
-        .map((id) => constructorById.get(id)?.name)
-        .filter((name): name is string => Boolean(name));
-      return { constructor, formerNames };
-    })
-    .sort((a, b) => a.constructor.name.localeCompare(b.constructor.name));
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="flex flex-col gap-8">
@@ -48,7 +38,7 @@ export default async function TeamsPage() {
       <section>
         <h2 className="mb-3 text-lg font-semibold">All Constructors</h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {teamEntries.map(({ constructor, formerNames }) => (
+          {teamEntries.map((constructor) => (
             <Link
               key={constructor.constructorId}
               href={`/teams/${constructor.constructorId}`}
@@ -57,11 +47,6 @@ export default async function TeamsPage() {
               <div>
                 <p className="font-medium">{constructor.name}</p>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{constructor.nationality}</p>
-                {formerNames.length > 0 && (
-                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-500">
-                    Formerly {formerNames.join(", ")}
-                  </p>
-                )}
               </div>
               {activeIds.has(constructor.constructorId) && (
                 <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400">
