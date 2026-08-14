@@ -9,6 +9,26 @@ function statusOrTime(result: Result): string {
   return result.status;
 }
 
+/** Renders a result's fastest lap time, with a purple "FL" badge (matching
+ * F1's own on-screen convention) for whoever set the fastest lap of the
+ * race — rank "1" in the API's own ranking of every driver's fastest lap. */
+function fastestLapCell(result: Result) {
+  const fastestLap = result.FastestLap;
+  if (!fastestLap) return <span className="text-zinc-400 dark:text-zinc-600">—</span>;
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {fastestLap.rank === "1" && (
+        <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-950 dark:text-purple-400">
+          FL
+        </span>
+      )}
+      {fastestLap.Time.time}
+      <span className="text-xs text-zinc-400 dark:text-zinc-600">L{fastestLap.lap}</span>
+    </span>
+  );
+}
+
 /** Parses a qualifying lap time like "1:12.345" or "58.945" into milliseconds. */
 function parseQualifyingTimeMs(time: string): number | null {
   const parts = time.split(":");
@@ -46,6 +66,7 @@ export function RaceResultsTable({ results }: { results: Result[] }) {
             <th className="px-4 py-2">Constructor</th>
             <th className="px-4 py-2">Grid</th>
             <th className="px-4 py-2">Time / Status</th>
+            <th className="px-4 py-2">Fastest Lap</th>
             <th className="px-4 py-2 text-right">Points</th>
           </tr>
         </thead>
@@ -61,6 +82,7 @@ export function RaceResultsTable({ results }: { results: Result[] }) {
               <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">{result.Constructor.name}</td>
               <td className="px-4 py-2">{result.grid}</td>
               <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">{statusOrTime(result)}</td>
+              <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">{fastestLapCell(result)}</td>
               <td className="px-4 py-2 text-right">{result.points}</td>
             </tr>
           ))}
