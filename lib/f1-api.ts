@@ -150,6 +150,22 @@ export async function getRaceResults(year: string | number, round: string | numb
 }
 
 /**
+ * Sprint race results for a single race weekend — null for a weekend with
+ * no sprint (most of them). NOTE: Sprint Qualifying (the session that sets
+ * the sprint's own grid — called the "Sprint Shootout" in 2023) has no
+ * corresponding endpoint anywhere in this API; confirmed against Jolpica's
+ * own endpoint docs, which list exactly 12 resources and "sprint" (the
+ * race) is the only sprint-weekend one among them. Only the sprint race
+ * itself is available here — see RaceDetailPage for how the gap is
+ * surfaced to the reader instead of just silently omitted.
+ */
+export async function getRaceSprintResults(year: string | number, round: string | number): Promise<Race | null> {
+  const revalidate = isPastSeason(year) ? REVALIDATE_LONG : REVALIDATE_SHORT;
+  const data = await f1Fetch<RaceTable>(`/${year}/${round}/sprint.json?limit=100`, revalidate);
+  return data.MRData.RaceTable.Races[0] ?? null;
+}
+
+/**
  * Every race's full results for an entire season (all rounds), paginated.
  * Used to count race starts per driver — standings only carry points/wins,
  * not a per-driver races-entered count, so this is the cheapest way to get

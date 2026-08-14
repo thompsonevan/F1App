@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCircuitResults, getQualifyingResults, getRaceResults } from "@/lib/f1-api";
+import { getCircuitResults, getQualifyingResults, getRaceResults, getRaceSprintResults } from "@/lib/f1-api";
 import { QualifyingResultsTable, RaceResultsTable } from "@/components/ResultsTable";
 import { driverName, f1tvSearchUrl, formatDate } from "@/lib/format";
 
@@ -31,8 +31,9 @@ export default async function RaceDetailPage({
 
   if (!race) notFound();
 
-  const [qualifying, circuitHistory] = await Promise.all([
+  const [qualifying, sprint, circuitHistory] = await Promise.all([
     getQualifyingResults(year, round),
+    getRaceSprintResults(year, round),
     getCircuitResults(race.Circuit.circuitId),
   ]);
 
@@ -80,6 +81,17 @@ export default async function RaceDetailPage({
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Qualifying results aren&apos;t available yet.</p>
         )}
       </section>
+
+      {sprint?.SprintResults && sprint.SprintResults.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold">Sprint Results</h2>
+          <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-500">
+            Sprint Qualifying — the session that set this sprint&apos;s own grid — isn&apos;t available from the
+            Jolpica API. Only the sprint race results below are.
+          </p>
+          <RaceResultsTable results={sprint.SprintResults} />
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Past Seasons at {race.Circuit.circuitName}</h2>
