@@ -194,6 +194,46 @@ export async function getSeasonResults(year: string | number): Promise<Race[]> {
 }
 
 /**
+ * Every sprint race's results for an entire season (all rounds), paginated.
+ * A separate endpoint from getSeasonResults — sprint weekends award their
+ * own points on top of the Grand Prix, and /{year}/results.json doesn't
+ * include them at all. Skipping this anywhere cumulative points are summed
+ * would silently undercount relative to the real championship total (caught
+ * live: 2023's chart totaled Red Bull at 790, not the real 860 — the 70-point
+ * gap was exactly that season's 6 sprints). Uses the same split-round
+ * reassembly as getSeasonResults, for the same reason — the pagination
+ * split bug applies here identically. Seasons with no sprints (most of F1
+ * history) just come back empty.
+ */
+export async function getSeasonSprintResults(year: string | number): Promise<Race[]> {
+  const revalidate = isPastSeason(year) ? REVALIDATE_LONG : REVALIDATE_SHORT;
+  const rawRaces = await f1FetchAllPages<RaceTable, Race>(
+    `/${year}/sprint.json`,
+    revalidate,
+    (page) => page.MRData.RaceTable.Races,
+  );
+
+  const byRound = new Map<string, Race>();
+  for (const race of rawRaces) {
+    const existing = byRound.get(race.round);
+    if (!existing) {
+      byRound.set(race.round, {
+        ...race,
+        SprintResults: race.SprintResults ? [...race.SprintResults] : race.SprintResults,
+      });
+      continue;
+    }
+    existing.SprintResults = [...(existing.SprintResults ?? []), ...(race.SprintResults ?? [])];
+  }
+
+  for (const race of byRound.values()) {
+    race.SprintResults?.sort((a, b) => Number(a.position) - Number(b.position));
+  }
+
+  return Array.from(byRound.values()).sort((a, b) => Number(a.round) - Number(b.round));
+}
+
+/**
  * Merges results into a season's schedule by round, so a race list can show
  * podium info without a click-through to the race's own page. A race that
  * hasn't happened yet (or whose results fetch failed/came back empty)

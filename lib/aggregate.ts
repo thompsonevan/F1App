@@ -355,3 +355,104 @@ export function mergeRaceStarts(directory: DriverDirectoryEntry[], raceStartsByD
     entry.raceStarts = raceStartsByDriver.get(entry.driverId) ?? 0;
   }
 }
+
+export interface ConstructorProgressionRound {
+  round: string;
+  raceName: string;
+}
+
+export interface ConstructorProgressionSeries {
+  constructorId: string;
+  name: string;
+  /** Cumulative points after each round, aligned index-for-index with `rounds`. */
+  points: number[];
+  finalPoints: number;
+}
+
+export interface ConstructorProgression {
+  rounds: ConstructorProgressionRound[];
+  /** Sorted by final cumulative points, descending — the order a "Championship Progression" chart should color/legend by. */
+  series: ConstructorProgressionSeries[];
+}
+
+/**
+ * Cumulative constructor points after each completed round of a season —
+ * the data behind a championship-progression chart. Built from the same
+ * `getSeasonResults` output already used for the season's calendar/results
+ * (already reassembled correctly per-race after the pagination-split bug
+ * fixed in getSeasonResults itself), so this needs no extra API calls for
+ * the Grand Prix side. `sprintRaces` (getSeasonSprintResults) is a second,
+ * separate fetch, folded in by round — a sprint weekend awards points on
+ * top of the Grand Prix, and omitting it would undercount every round from
+ * a sprint weekend onward relative to the real championship total.
+ *
+ * Only rounds with results are included — a season's remaining, not-yet-run
+ * rounds don't get a zero-points data point.
+ */
+export function summarizeConstructorPointsProgression(
+  seasonRaces: Race[],
+  sprintRaces: Race[] = [],
+): ConstructorProgression {
+  const completed = seasonRaces
+    .filter((race) => race.Results && race.Results.length > 0)
+    .slice()
+    .sort((a, b) => Number(a.round) - Number(b.round));
+
+  const rounds: ConstructorProgressionRound[] = completed.map((race) => ({
+    round: race.round,
+    raceName: race.raceName,
+  }));
+
+  const sprintPointsByRound = new Map<string, Map<string, number>>();
+  for (const race of sprintRaces) {
+    const byConstructor = new Map<string, number>();
+    for (const result of race.SprintResults ?? []) {
+      const id = result.Constructor.constructorId;
+      byConstructor.set(id, (byConstructor.get(id) ?? 0) + (Number(result.points) || 0));
+    }
+    sprintPointsByRound.set(race.round, byConstructor);
+  }
+
+  // Points scored *in* each round alone, per constructor — race points plus
+  // that weekend's sprint points, if any — summed below into a running
+  // total. A constructor fields two cars, so a round's points for it are
+  // the sum of both entries' results.
+  const pointsPerRound: Map<string, number>[] = completed.map((race) => {
+    const byConstructor = new Map<string, number>();
+    for (const result of race.Results ?? []) {
+      const id = result.Constructor.constructorId;
+      byConstructor.set(id, (byConstructor.get(id) ?? 0) + (Number(result.points) || 0));
+    }
+    for (const [id, sprintPoints] of sprintPointsByRound.get(race.round) ?? []) {
+      byConstructor.set(id, (byConstructor.get(id) ?? 0) + sprintPoints);
+    }
+    return byConstructor;
+  });
+
+  const namesById = new Map<string, string>();
+  for (const race of completed) {
+    for (const result of race.Results ?? []) {
+      namesById.set(result.Constructor.constructorId, result.Constructor.name);
+    }
+  }
+  for (const race of sprintRaces) {
+    for (const result of race.SprintResults ?? []) {
+      if (!namesById.has(result.Constructor.constructorId)) {
+        namesById.set(result.Constructor.constructorId, result.Constructor.name);
+      }
+    }
+  }
+
+  const series: ConstructorProgressionSeries[] = Array.from(namesById.entries()).map(([constructorId, name]) => {
+    let running = 0;
+    const points = pointsPerRound.map((roundPoints) => {
+      running += roundPoints.get(constructorId) ?? 0;
+      return running;
+    });
+    return { constructorId, name, points, finalPoints: points[points.length - 1] ?? 0 };
+  });
+
+  series.sort((a, b) => b.finalPoints - a.finalPoints);
+
+  return { rounds, series };
+}

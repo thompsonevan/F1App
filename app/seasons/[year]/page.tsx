@@ -5,9 +5,12 @@ import {
   getDriverStandings,
   getSeasonResults,
   getSeasonSchedule,
+  getSeasonSprintResults,
   mergeRaceResults,
 } from "@/lib/f1-api";
+import { summarizeConstructorPointsProgression } from "@/lib/aggregate";
 import RaceCard from "@/components/RaceCard";
+import StandingsProgressionChart from "@/components/StandingsProgressionChart";
 import StandingsTable from "@/components/StandingsTable";
 
 export async function generateMetadata({
@@ -32,13 +35,18 @@ export default async function SeasonDetailPage({
 
   if (!schedule || schedule.length === 0) notFound();
 
-  const [driverStandings, constructorStandings, results] = await Promise.all([
+  const [driverStandings, constructorStandings, results, sprintResults] = await Promise.all([
     getDriverStandings(year).catch(() => []),
     getConstructorStandings(year).catch(() => []),
     getSeasonResults(year).catch(() => []),
+    getSeasonSprintResults(year).catch(() => []),
   ]);
 
   const races = mergeRaceResults(schedule, results);
+  const progression = summarizeConstructorPointsProgression(results, sprintResults);
+  const officialFinalPointsById = new Map(
+    constructorStandings.map((standing) => [standing.Constructor.constructorId, Number(standing.points)]),
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -65,6 +73,13 @@ export default async function SeasonDetailPage({
           )}
         </section>
       </div>
+
+      {progression.series.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Championship Progression</h2>
+          <StandingsProgressionChart progression={progression} officialFinalPointsById={officialFinalPointsById} />
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Calendar</h2>

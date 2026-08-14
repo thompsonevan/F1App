@@ -97,6 +97,8 @@ export interface Race {
   time?: string;
   Results?: Result[];
   QualifyingResults?: QualifyingResult[];
+  /** Only populated by getSeasonSprintResults — a separate endpoint, not part of the regular results fetch. */
+  SprintResults?: Result[];
 }
 
 export interface DriverStanding {
