@@ -1,17 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDriver, getDriverCareerResults, getDriverStandings } from "@/lib/f1-api";
-import { groupDriverRacesBySeason, summarizeBySeasons, summarizeCareer } from "@/lib/aggregate";
-import { mapWithConcurrency } from "@/lib/concurrency";
+import { getDriver } from "@/lib/f1-api";
+import { groupDriverRacesBySeason } from "@/lib/aggregate";
+import { getDriverProfile } from "@/lib/driver-profile";
 import { driverName, formatDate } from "@/lib/format";
 import DriverSeasonExplorer from "@/components/DriverSeasonExplorer";
-
-/** Cap on concurrent per-season standings requests, plus a stagger between
- * each slot's start — kept conservative on purpose. A long career means a
- * slower load, but that's preferable to tripping Jolpica's rate limit. */
-const STANDINGS_FETCH_CONCURRENCY = 2;
-const STANDINGS_FETCH_STAGGER_MS = 150;
 
 export async function generateMetadata({
   params,
@@ -36,52 +30,30 @@ export default async function DriverDetailPage({
   params: Promise<{ driverId: string }>;
 }) {
   const { driverId } = await params;
-  const driver = await getDriver(driverId);
-  if (!driver) notFound();
-
-  const careerRaces = await getDriverCareerResults(driverId);
-  const seasonSummaries = summarizeBySeasons(careerRaces);
-  const careerTotals = summarizeCareer(careerRaces);
-
-  // The results endpoint doesn't return final championship position, so pull
-  // standings for each season the driver raced in and match it up. Fetched
-  // with capped, staggered concurrency (rather than one giant Promise.all)
-  // so a long career doesn't burst past the API's rate limit and silently
-  // lose years — f1Fetch already retries transient failures (with a real
-  // new request each time, not a memoized replay of the same failure), so
-  // a season only ends up empty here if it genuinely has no standings data.
-  const standingsPerSeason = await mapWithConcurrency(
-    seasonSummaries,
-    STANDINGS_FETCH_CONCURRENCY,
-    (summary) =>
-      getDriverStandings(summary.season).catch((err) => {
-        console.error(`Failed to load ${summary.season} standings for driver ${driverId}:`, err);
-        return [];
-      }),
-    STANDINGS_FETCH_STAGGER_MS,
-  );
-
-  let championships = 0;
-  seasonSummaries.forEach((summary, i) => {
-    const standing = standingsPerSeason[i].find((s) => s.Driver.driverId === driverId);
-    if (standing) {
-      summary.finalPosition = standing.position;
-      if (standing.position === "1") championships += 1;
-    }
-  });
+  const profile = await getDriverProfile(driverId);
+  if (!profile) notFound();
+  const { driver, careerRaces, seasonSummaries, careerTotals, championships } = profile;
 
   const racesBySeason = Object.fromEntries(groupDriverRacesBySeason(careerRaces));
   const mostRecentSeason = seasonSummaries[seasonSummaries.length - 1]?.season;
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-bold">{driverName(driver)}</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          {driver.nationality} · Born {formatDate(driver.dateOfBirth)}
-          {driver.permanentNumber && <> · #{driver.permanentNumber}</>}
-          {driver.code && <> · {driver.code}</>}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">{driverName(driver)}</h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {driver.nationality} · Born {formatDate(driver.dateOfBirth)}
+            {driver.permanentNumber && <> · #{driver.permanentNumber}</>}
+            {driver.code && <> · {driver.code}</>}
+          </p>
+        </div>
+        <Link
+          href={`/drivers/compare?driver1=${driver.driverId}`}
+          className="shrink-0 rounded-full border border-black/10 px-4 py-2 text-sm font-medium hover:bg-black/[.02] dark:border-white/10 dark:hover:bg-white/[.03]"
+        >
+          Compare with another driver →
+        </Link>
       </div>
 
       {mostRecentSeason && (
