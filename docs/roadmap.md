@@ -76,10 +76,14 @@ the code compiles.
   `?search=` query (confirmed working format) — that's the ceiling without a
   hand-maintained ID mapping (tried once, reverted — see git history for
   `lib/f1tv-links.ts` if you want the reasoning before reconsidering it).
-- **`lib/team-lineage.ts`** (the Jordan→Aston Martin style rebrand mapping)
-  was hand-curated from general F1 knowledge, not verified against live data.
-  Spot-check it against the real API before trusting it for anything
-  important.
+- **`lib/team-lineage.ts`** (the Jordan→Aston Martin style rebrand mapping) is
+  currently **disabled/unwired** — as of 2026-08-14, `/teams` and
+  `/teams/[constructorId]` show every constructorId as its own standalone
+  page with no cross-id rollup, and `/api/search` links former names to their
+  own page rather than a canonical one. The hand-curated mapping data is
+  still in the file, just unused, so it can be re-wired later. If you do,
+  re-verify it against live data first — it was originally hand-curated from
+  general F1 knowledge with no network access to check it.
 
 ---
 
@@ -212,12 +216,14 @@ already does for a single team's detail page. Reuse `canonicalConstructorId`/
 
 ## Verify / harden
 
-### Verify `lib/team-lineage.ts` against live data
-Search `/teams` for a few former names ("Jordan", "Minardi", "Tyrrell") and
-confirm they resolve to the right current team. The `mercedes` entry is the
-one flagged as most uncertain in its own code comment — worth checking
-whether Jolpica's `mercedes` constructorId also (incorrectly) covers the
-unrelated 1954–55 Mercedes-Benz works team.
+### Re-wire `lib/team-lineage.ts`, if/when wanted back
+This was verify-then-use, but the functionality was turned off entirely
+instead (2026-08-14) — see the "Known, deliberate limitations" note above.
+If it comes back: search `/teams` for a few former names ("Jordan",
+"Minardi", "Tyrrell") and confirm they resolve to the right current team. The
+`mercedes` entry is the one flagged as most uncertain in its own code
+comment — worth checking whether Jolpica's `mercedes` constructorId also
+(incorrectly) covers the unrelated 1954–55 Mercedes-Benz works team.
 
 ### Add a real test suite
 There are currently **zero test files in this repo** (confirmed:
