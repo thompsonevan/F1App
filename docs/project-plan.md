@@ -105,4 +105,4 @@ Full docs: https://github.com/jolpica/jolpica-f1 (docs folder has a page per end
 ## Open Questions / Decisions for Later
 - Driver/circuit photos: Jolpica doesn't provide images. Either skip images for v1, or source them separately later.
 - How far back should "career stats" aggregation reach for very old drivers (1950s era) — may need pagination handling since some endpoints cap results per page.
-- Whether to add a lightweight cache/DB layer later if API rate limits become an issue with traffic.
+- Whether to add a lightweight cache/DB layer later if API rate limits become an issue with traffic. **Decided:** yes — see `docs/backend-integration-plan.md` (Neon Postgres on Vercel + a scheduled refresh job). This is the next project task.

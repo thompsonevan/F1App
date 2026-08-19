@@ -8,6 +8,14 @@ you don't have to re-derive established patterns.
 Start by reading `docs/project-plan.md` (original spec) and `README.md`
 (current structure). This file assumes you've read both.
 
+## Next up
+
+**The precomputed data layer (see "Bigger investments" below) is the next
+task, and the decision that section used to defer is now made:** a real
+database — Neon Postgres, provisioned via Vercel — populated by a scheduled
+refresh job. Full plan, phased, in `docs/backend-integration-plan.md`. Read
+that before picking up any other item below if you're free to choose.
+
 ## Important context before you start
 
 **Nothing in this app has been tested against live data.** Every feature to
@@ -258,22 +266,21 @@ been specifically audited).
 
 ### A precomputed data layer
 This is what actually unlocks the things currently ruled out as infeasible:
-podiums/poles for every driver, verified F1TV direct links, fast arbitrary
-historical race search. The original `docs/project-plan.md` flagged this
-exact tradeoff: *"Whether to add a lightweight cache/DB layer later if API
-rate limits become an issue with traffic."* We've now hit that wall for real
-more than once. Two shapes this could take:
+podiums/poles for every driver, a real constructor All-Time view (with
+`lib/team-lineage.ts` rolled in), fast arbitrary historical race search. The
+original `docs/project-plan.md` flagged this exact tradeoff: *"Whether to add
+a lightweight cache/DB layer later if API rate limits become an issue with
+traffic."* We've now hit that wall for real more than once.
 
-- **A real database** (Postgres/SQLite/KV), populated by a scheduled job that
-  walks the full API at a controlled pace and stores aggregated stats. Changes
-  the hosting story — no longer "deploy anywhere with zero config."
-- **A periodically-regenerated static dataset** committed to the repo or built
-  as a separate artifact, refreshed by a script/cron/GitHub Action rather than
-  computed live on every request. Avoids a DB but needs a refresh pipeline and
-  accepts staleness between refreshes.
-
-Don't start this without deciding which shape first — it's a real
-architecture change, not an incremental feature.
+**Decided (2026-08-19):** a real database — Neon Postgres, provisioned via
+Vercel's Storage tab, populated by a one-time backfill script plus a daily
+Vercel Cron job for incremental refresh. Chosen over a periodically
+regenerated static dataset because this needs relational sort/filter/rollup
+operations (all-time driver rankings, lineage rollups), and over Render
+because Render's free Postgres expires after 30 days and it has no free tier
+for scheduled jobs at all. Full phased plan, including schema sketch and
+which pages get rewired first: `docs/backend-integration-plan.md`. **This is
+the next project task** — see "Next up" near the top of this file.
 
 ### Live timing / telemetry
 Jolpica only has classification-level data (results, standings, schedules) —
