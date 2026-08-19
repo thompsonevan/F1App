@@ -10,11 +10,15 @@ Start by reading `docs/project-plan.md` (original spec) and `README.md`
 
 ## Next up
 
-**The precomputed data layer (see "Bigger investments" below) is the next
-task, and the decision that section used to defer is now made:** a real
-database — Neon Postgres, provisioned via Vercel — populated by a scheduled
-refresh job. Full plan, phased, in `docs/backend-integration-plan.md`. Read
-that before picking up any other item below if you're free to choose.
+**A local data mirror (see "Bigger investments" below) is the next task,
+and the decision that section used to defer is now made:** a real
+database — Neon Postgres, provisioned via Vercel — mirroring drivers,
+circuits, races, and teams, checked before falling back to a live Jolpica
+fetch, kept fresh by a scheduled refresh job. This is infrastructure only —
+no podiums/poles, no constructor lineage rollup, no new pages; those are
+possible later follow-ups, not part of this task. Full plan, phased, in
+`docs/backend-integration-plan.md`. Read that before picking up any other
+item below if you're free to choose.
 
 ## Important context before you start
 
@@ -84,14 +88,18 @@ the code compiles.
   `?search=` query (confirmed working format) — that's the ceiling without a
   hand-maintained ID mapping (tried once, reverted — see git history for
   `lib/f1tv-links.ts` if you want the reasoning before reconsidering it).
-- **`lib/team-lineage.ts`** (the Jordan→Aston Martin style rebrand mapping) is
-  currently **disabled/unwired** — as of 2026-08-14, `/teams` and
+- **Constructor lineage rollup (Jordan→Aston Martin style rebrands) is not
+  implemented.** `lib/team-lineage.ts`, which held a hand-curated
+  former-id → canonical-id mapping, was removed entirely as of 2026-08-19
+  (see git history for `lib/team-lineage.ts` if you want the original
+  mapping data back as a starting point) — `/teams` and
   `/teams/[constructorId]` show every constructorId as its own standalone
-  page with no cross-id rollup, and `/api/search` links former names to their
-  own page rather than a canonical one. The hand-curated mapping data is
-  still in the file, just unused, so it can be re-wired later. If you do,
-  re-verify it against live data first — it was originally hand-curated from
-  general F1 knowledge with no network access to check it.
+  page with no cross-id rollup, and `/api/search` links former names to
+  their own page rather than a canonical one. If this comes back, re-verify
+  each lineage against live data first — it was originally hand-curated
+  from general F1 knowledge with no network access to check it, and the
+  `mercedes` entry in particular was flagged as uncertain (risk of
+  incorrectly merging in the unrelated 1954–55 Mercedes-Benz works team).
 
 ---
 
@@ -215,23 +223,26 @@ already exists per-season. Mirror the same lazy-load-once-per-tab-switch
 pattern rather than blocking the default page load.
 
 **Watch out for:** team lineage. A constructor's stats should probably
-aggregate across `lib/team-lineage.ts` chains (Jordan+Midland+...+Aston
-Martin as one row), the same way `app/teams/[constructorId]/page.tsx`
-already does for a single team's detail page. Reuse `canonicalConstructorId`/
-`lineageFor` rather than building parallel logic.
+aggregate across rebrand chains (Jordan+Midland+...+Aston Martin as one
+row) rather than showing each former id as a disconnected entry. There's no
+existing lineage-rollup code to reuse right now — `lib/team-lineage.ts` was
+removed (see "Known, deliberate limitations" above) — so this would mean
+rebuilding that mapping, not just re-wiring it.
 
 ---
 
 ## Verify / harden
 
-### Re-wire `lib/team-lineage.ts`, if/when wanted back
-This was verify-then-use, but the functionality was turned off entirely
-instead (2026-08-14) — see the "Known, deliberate limitations" note above.
-If it comes back: search `/teams` for a few former names ("Jordan",
-"Minardi", "Tyrrell") and confirm they resolve to the right current team. The
-`mercedes` entry is the one flagged as most uncertain in its own code
-comment — worth checking whether Jolpica's `mercedes` constructorId also
-(incorrectly) covers the unrelated 1954–55 Mercedes-Benz works team.
+### Rebuild constructor lineage rollup, if/when wanted back
+This was verify-then-use, but the file was removed entirely instead
+(`lib/team-lineage.ts`, deleted 2026-08-19) — see the "Known, deliberate
+limitations" note above. Git history for that path has the original
+hand-curated mapping if it's worth starting from. If it comes back: search
+`/teams` for a few former names ("Jordan", "Minardi", "Tyrrell") and
+confirm they resolve to the right current team. The `mercedes` entry was
+flagged as most uncertain in the original file's own code comment — worth
+checking whether Jolpica's `mercedes` constructorId also (incorrectly)
+covers the unrelated 1954–55 Mercedes-Benz works team.
 
 ### Add a real test suite
 There are currently **zero test files in this repo** (confirmed:
@@ -247,7 +258,6 @@ first targets, since they're pure functions with no network dependency:
 - `lib/f1-api.ts`: the reassembly logic inside `getSeasonResults` (the exact
   split-race scenario described above is a perfect regression test),
   `mergeRaceResults`
-- `lib/team-lineage.ts`: `canonicalConstructorId` resolution
 
 No test runner is configured yet — pick one (`vitest` is the common choice
 for a Next.js + TypeScript project and needs minimal config) and wire a
@@ -264,23 +274,28 @@ been specifically audited).
 
 ## Bigger investments (worth a real discussion before starting)
 
-### A precomputed data layer
-This is what actually unlocks the things currently ruled out as infeasible:
-podiums/poles for every driver, a real constructor All-Time view (with
-`lib/team-lineage.ts` rolled in), fast arbitrary historical race search. The
-original `docs/project-plan.md` flagged this exact tradeoff: *"Whether to add
-a lightweight cache/DB layer later if API rate limits become an issue with
-traffic."* We've now hit that wall for real more than once.
+### A local data mirror
+The long-term motivation is what this eventually unlocks — podiums/poles
+for every driver, a real constructor All-Time view, fast arbitrary
+historical race search — and the original `docs/project-plan.md` flagged
+this exact tradeoff: *"Whether to add a lightweight cache/DB layer later if
+API rate limits become an issue with traffic."* We've now hit that wall for
+real more than once. **But the task actually scoped and decided right now
+is narrower than all of that:** just the mirror itself — drivers, circuits,
+races, teams — checked before falling back to a live Jolpica fetch, kept
+fresh by a scheduled job. No derived stats tables, no lineage rollup, no
+new pages; those stay possible future work on top of the mirror, not part
+of building it.
 
 **Decided (2026-08-19):** a real database — Neon Postgres, provisioned via
 Vercel's Storage tab, populated by a one-time backfill script plus a daily
 Vercel Cron job for incremental refresh. Chosen over a periodically
-regenerated static dataset because this needs relational sort/filter/rollup
-operations (all-time driver rankings, lineage rollups), and over Render
-because Render's free Postgres expires after 30 days and it has no free tier
-for scheduled jobs at all. Full phased plan, including schema sketch and
-which pages get rewired first: `docs/backend-integration-plan.md`. **This is
-the next project task** — see "Next up" near the top of this file.
+regenerated static dataset because even a plain mirror needs relational
+lookups (every race at a circuit, every result for a driver), and over
+Render because Render's free Postgres expires after 30 days and it has no
+free tier for scheduled jobs at all. Full phased plan:
+`docs/backend-integration-plan.md`. **This is the next project task** — see
+"Next up" near the top of this file.
 
 ### Live timing / telemetry
 Jolpica only has classification-level data (results, standings, schedules) —
